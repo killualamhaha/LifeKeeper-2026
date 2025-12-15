@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LifeKeeper 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap');
+      
+      body {
+        font-family: 'Outfit', sans-serif;
+        background-color: #fff9f0; /* Warm white/cream base */
+        /* Luminary Gradient: Radiant light from top, soft healing colors on sides */
+        background-image: 
+          radial-gradient(circle at 50% -20%, hsla(45, 100%, 85%, 0.8) 0%, transparent 60%), /* Divine Golden Light */
+          radial-gradient(circle at 90% 20%, hsla(270, 60%, 92%, 0.6) 0%, transparent 50%), /* Spiritual Violet */
+          radial-gradient(circle at 10% 20%, hsla(340, 70%, 92%, 0.6) 0%, transparent 50%), /* Compassionate Rose */
+          radial-gradient(circle at 50% 100%, hsla(45, 60%, 90%, 0.4) 0%, transparent 50%); /* Grounding Amber */
+        background-size: cover;
+        background-attachment: fixed;
+      }
+      
+      /* Luminary Scrollbar - Gold/Light */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #e2d9c0; /* Pale gold */
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #d4c5a0; 
+      }
+
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.75); /* Lighter, crystalline */
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        box-shadow: 0 8px 32px 0 rgba(212, 197, 160, 0.2); /* Warm golden shadow */
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0"
+  }
+}
+</script>
+</head>
+  <body class="text-slate-700 antialiased h-screen overflow-hidden">
+    <div id="root" class="h-full"></div>
+  </body>
+</html>
