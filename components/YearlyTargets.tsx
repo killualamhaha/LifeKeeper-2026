@@ -50,10 +50,19 @@ const YearlyTargets: React.FC = () => {
 
 
   // Reflection State (Transient)
-  const [currentReflectionWeek, setCurrentReflectionWeek] = useState(19);
+  // Calculate current week number roughly
+  const getWeekNumber = (d: Date) => {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+    return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
+  };
+  
+  const [currentReflectionWeek, setCurrentReflectionWeek] = useState(getWeekNumber(new Date()));
 
   // Calendar State (Transient)
-  const [viewDate, setViewDate] = useState(new Date(2026, 4, 1)); // May 2026
+  const [viewDate, setViewDate] = useState(new Date()); 
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   // Calendar Helpers
@@ -113,7 +122,8 @@ const YearlyTargets: React.FC = () => {
   };
 
   const getMonthForWeek = (week: number) => {
-    const d = new Date(2026, 0, 1 + (week - 1) * 7);
+    // Rough estimate for display
+    const d = new Date(year, 0, 1 + (week - 1) * 7);
     return d.toLocaleString('default', { month: 'long' });
   };
 
@@ -123,7 +133,7 @@ const YearlyTargets: React.FC = () => {
         return (
           <div className="h-full flex flex-col">
             <div className="mb-4 p-4 bg-purple-50 rounded-xl border border-purple-100 text-sm text-purple-800">
-              <h3 className="font-semibold mb-1">Strategic Focus 2026</h3>
+              <h3 className="font-semibold mb-1">Strategic Focus {year}</h3>
               <p>Define your core pillars. What does success look like this year? (Auto-saved)</p>
             </div>
             <textarea 

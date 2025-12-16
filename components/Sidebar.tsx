@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NAV_ITEMS } from '../constants';
 import { NavSection } from '../types';
 
@@ -8,6 +8,17 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
+  const [currentDate, setCurrentDate] = useState<string>('');
+
+  useEffect(() => {
+    // Set initial date (client-side only to match hydration if using SSR, though here is CSR)
+    setCurrentDate(new Date().toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric' 
+    }));
+  }, []);
+
   return (
     <aside className="w-20 lg:w-64 flex-shrink-0 flex flex-col gap-2 p-4 h-full">
       <div className="mb-8 pl-2 lg:pl-4 pt-2">
@@ -49,7 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
       <div className="glass-panel p-4 rounded-2xl mt-auto border-amber-100/50">
         <div className="text-xs text-amber-600/60 mb-1 tracking-widest font-semibold">CURRENT DATE</div>
         <div className="text-sm font-mono text-slate-600">
-            May 12, 2026
+            {currentDate}
         </div>
       </div>
     </aside>

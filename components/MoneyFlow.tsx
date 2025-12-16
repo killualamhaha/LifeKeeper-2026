@@ -73,7 +73,7 @@ const MoneyFlow: React.FC = () => {
   const [editId, setEditId] = useState<string | null>(null);
   
   // Date State
-  const [selectedMonth, setSelectedMonth] = useState('2026-05');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   
   // Banking State
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);

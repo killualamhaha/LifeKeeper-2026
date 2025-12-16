@@ -1,34 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Check, Utensils, Sparkles, ChefHat, Leaf, Coffee, Moon, Sun, Pencil, X, Save } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Trash2, Check, Utensils, Sparkles, ChefHat, Leaf, Coffee, Moon, Sun, Pencil, X, Save, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { COLORS } from '../constants';
 import { ScheduleEvent, TodoItem, MealPlan } from '../types';
 import { generateMealPlan } from '../services/geminiService';
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const CUISINES = ['Balanced', 'Mediterranean', 'Asian', 'Vegetarian', 'Quick & Easy', 'Keto'];
 
-const INITIAL_SCHEDULE: Record<string, ScheduleEvent[]> = {
-    'Mon': [
+// Initial template to seed the CURRENT week if empty
+const TEMPLATE_SCHEDULE_BY_DAY_INDEX: Record<number, ScheduleEvent[]> = {
+    1: [ // Mon
       { id: '1', time: '08:00', activity: 'Morning Yoga' },
       { id: '2', time: '09:00', activity: 'Deep Work' },
       { id: '3', time: '12:00', activity: 'Nutrient Break' },
     ],
-    'Tue': [
+    2: [ // Tue
       { id: '4', time: '07:30', activity: 'Morning Run' },
       { id: '5', time: '09:30', activity: 'Client Sync' },
     ],
-    'Wed': [
+    3: [ // Wed
       { id: '6', time: '08:00', activity: 'Yoga Flow' },
       { id: '7', time: '14:00', activity: 'Strategy' },
     ],
-    'Thu': [],
-    'Fri': [
+    4: [], // Thu
+    5: [ // Fri
       { id: '8', time: '16:00', activity: 'Weekly Review' },
     ],
-    'Sat': [
+    6: [ // Sat
       { id: '9', time: '10:00', activity: 'Farmers Market' },
     ],
-    'Sun': [
+    0: [ // Sun
        { id: '10', time: '11:00', activity: 'Family Brunch' },
     ]
 };
@@ -38,81 +38,120 @@ const INITIAL_TODOS: TodoItem[] = [
     { id: '2', text: 'Buy hydrangeas', completed: true, category: 'personal' },
 ];
 
-const Timetable: React.FC = () => {
-  const [selectedDay, setSelectedDay] = useState('Mon');
+const getStartOfWeek = (d: Date) => {
+    const date = new Date(d);
+    const day = date.getDay(); // 0 is Sunday
+    // Adjust to make Monday (1) the start of the week. 
+    // If Sunday (0), go back 6 days. Else go back (day - 1) days.
+    const diff = date.getDate() - (day === 0 ? 6 : day - 1);
+    const start = new Date(date.setDate(diff));
+    start.setHours(0,0,0,0);
+    return start;
+};
 
-  // -- STATE WITH PERSISTENCE --
+const formatDateKey = (date: Date) => {
+    return date.toISOString().split('T')[0]; // YYYY-MM-DD
+};
+
+const getWeekNumber = (d: Date) => {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+    return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
+};
+
+const Timetable: React.FC = () => {
+  // Navigation State
+  const [currentWeekStart, setCurrentWeekStart] = useState(getStartOfWeek(new Date()));
+  const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
+
+  // --- DATA STATE WITH PERSISTENCE ---
   
-  // Schedule
-  const [weeklySchedule, setWeeklySchedule] = useState<Record<string, ScheduleEvent[]>>(() => {
-    const saved = localStorage.getItem('timetable_schedule');
-    return saved ? JSON.parse(saved) : INITIAL_SCHEDULE;
+  // Events: Keyed by "YYYY-MM-DD"
+  const [events, setEvents] = useState<Record<string, ScheduleEvent[]>>(() => {
+      const saved = localStorage.getItem('timetable_events_v2');
+      if (saved) return JSON.parse(saved);
+
+      // Seed current week with template if empty
+      const seed: Record<string, ScheduleEvent[]> = {};
+      const start = getStartOfWeek(new Date());
+      for (let i = 0; i < 7; i++) {
+          const d = new Date(start);
+          d.setDate(d.getDate() + i);
+          const dayIndex = d.getDay();
+          const key = formatDateKey(d);
+          // Only seed if we are strictly in the "initial" state logic (though here we just do it once on fresh load)
+          // We map the static template to the dynamic dates of THIS week
+          if (TEMPLATE_SCHEDULE_BY_DAY_INDEX[dayIndex]) {
+             seed[key] = TEMPLATE_SCHEDULE_BY_DAY_INDEX[dayIndex];
+          }
+      }
+      return seed;
   });
 
-  // Todos
+  // Todos: Global list (carrying over)
   const [todos, setTodos] = useState<TodoItem[]>(() => {
     const saved = localStorage.getItem('timetable_todos');
     return saved ? JSON.parse(saved) : INITIAL_TODOS;
   });
 
-  // Food Menu
-  const [weeklyMenu, setWeeklyMenu] = useState<Record<string, MealPlan> | null>(() => {
-      const saved = localStorage.getItem('timetable_menu');
-      return saved ? JSON.parse(saved) : null;
+  // Menu: Keyed by "YYYY-MM-DD"
+  const [menus, setMenus] = useState<Record<string, MealPlan>>(() => {
+      const saved = localStorage.getItem('timetable_menus_v2');
+      return saved ? JSON.parse(saved) : {};
   });
 
   // Persistence Effects
-  useEffect(() => {
-    localStorage.setItem('timetable_schedule', JSON.stringify(weeklySchedule));
-  }, [weeklySchedule]);
-
-  useEffect(() => {
-    localStorage.setItem('timetable_todos', JSON.stringify(todos));
-  }, [todos]);
-
-  useEffect(() => {
-    localStorage.setItem('timetable_menu', JSON.stringify(weeklyMenu));
-  }, [weeklyMenu]);
+  useEffect(() => { localStorage.setItem('timetable_events_v2', JSON.stringify(events)); }, [events]);
+  useEffect(() => { localStorage.setItem('timetable_todos', JSON.stringify(todos)); }, [todos]);
+  useEffect(() => { localStorage.setItem('timetable_menus_v2', JSON.stringify(menus)); }, [menus]);
 
 
-  // Food Menu UI State
+  // Computed current week days
+  const weekDays = useMemo(() => {
+      return Array.from({length: 7}, (_, i) => {
+          const d = new Date(currentWeekStart);
+          d.setDate(d.getDate() + i);
+          return d;
+      });
+  }, [currentWeekStart]);
+
+  const currentMonthName = currentWeekStart.toLocaleString('default', { month: 'long' });
+  const currentWeekNum = getWeekNumber(currentWeekStart);
+  const currentYear = currentWeekStart.getFullYear();
+
+  // Handlers for Navigation
+  const changeWeek = (offset: number) => {
+      const newStart = new Date(currentWeekStart);
+      newStart.setDate(newStart.getDate() + (offset * 7));
+      setCurrentWeekStart(newStart);
+      // Select the monday of the new week by default
+      setSelectedDateKey(formatDateKey(newStart));
+  };
+
+  const jumpToToday = () => {
+      const start = getStartOfWeek(new Date());
+      setCurrentWeekStart(start);
+      setSelectedDateKey(formatDateKey(new Date()));
+  };
+
+  // UI State for Features
   const [ingredients, setIngredients] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState('Balanced');
   const [isGeneratingMenu, setIsGeneratingMenu] = useState(false);
-
-  // Edit States
-  const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
   
-  const [editingMenuDay, setEditingMenuDay] = useState<string | null>(null);
+  // Menu Editing
+  const [editingMenuDateKey, setEditingMenuDateKey] = useState<string | null>(null);
   const [tempMenuData, setTempMenuData] = useState<MealPlan>({ breakfast: '', lunch: '', dinner: '', snack: '' });
 
-  // Todo handlers
-  const handleAddTodo = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-      const newTodo: TodoItem = {
-        id: Date.now().toString(),
-        text: e.currentTarget.value,
-        completed: false,
-        category: 'personal'
-      };
-      setTodos([...todos, newTodo]);
-      e.currentTarget.value = '';
-    }
-  };
 
-  const toggleTodo = (id: string) => {
-    setTodos(todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-  };
+  // --- EVENT LOGIC ---
 
-  const deleteTodo = (id: string) => {
-    setTodos(todos.filter(t => t.id !== id));
-  };
-
-  // Schedule handlers
   const handleAddEvent = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-      // Basic time parser to allow format "09:00 Meeting"
       const val = e.currentTarget.value;
       const timeRegex = /^(\d{1,2}:\d{2})\s+(.*)$/;
       const match = val.match(timeRegex);
@@ -131,9 +170,9 @@ const Timetable: React.FC = () => {
         activity: newActivity
       };
 
-      setWeeklySchedule(prev => ({
+      setEvents(prev => ({
         ...prev,
-        [selectedDay]: [...(prev[selectedDay] || []), newEvent]
+        [selectedDateKey]: [...(prev[selectedDateKey] || []), newEvent]
       }));
       e.currentTarget.value = '';
     }
@@ -146,9 +185,9 @@ const Timetable: React.FC = () => {
 
   const saveEditedEvent = () => {
     if (editingEvent) {
-      setWeeklySchedule(prev => ({
+      setEvents(prev => ({
         ...prev,
-        [selectedDay]: prev[selectedDay].map(e => e.id === editingEvent.id ? editingEvent : e)
+        [selectedDateKey]: (prev[selectedDateKey] || []).map(e => e.id === editingEvent.id ? editingEvent : e)
       }));
       setIsEventModalOpen(false);
       setEditingEvent(null);
@@ -156,9 +195,9 @@ const Timetable: React.FC = () => {
   };
 
   const deleteEvent = (eventId: string) => {
-    setWeeklySchedule(prev => ({
+    setEvents(prev => ({
       ...prev,
-      [selectedDay]: prev[selectedDay].filter(e => e.id !== eventId)
+      [selectedDateKey]: (prev[selectedDateKey] || []).filter(e => e.id !== eventId)
     }));
     if (editingEvent?.id === eventId) {
       setIsEventModalOpen(false);
@@ -166,14 +205,29 @@ const Timetable: React.FC = () => {
     }
   };
 
-  // Menu Generator Handler
+
+  // --- MENU LOGIC ---
   const handleGenerateMenu = async () => {
     setIsGeneratingMenu(true);
     try {
       const result = await generateMealPlan(ingredients, selectedCuisine);
       const cleanJson = result.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsedMenu = JSON.parse(cleanJson);
-      setWeeklyMenu(parsedMenu);
+      
+      // parsedMenu returns { "Mon": ..., "Tue": ... }
+      // We need to map these to the ACTUAL dates of the current displayed week
+      const newMenus = { ...menus };
+      const dayMap: Record<string, number> = { "Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6 };
+      
+      Object.entries(parsedMenu).forEach(([dayName, plan]) => {
+          if (dayMap[dayName] !== undefined) {
+             const targetDate = new Date(currentWeekStart);
+             targetDate.setDate(targetDate.getDate() + dayMap[dayName]);
+             newMenus[formatDateKey(targetDate)] = plan as MealPlan;
+          }
+      });
+
+      setMenus(newMenus);
     } catch (e) {
       console.error("Failed to parse menu", e);
     } finally {
@@ -181,77 +235,117 @@ const Timetable: React.FC = () => {
     }
   };
 
-  const startEditMenu = (day: string) => {
-    const currentMenu = weeklyMenu && weeklyMenu[day] ? weeklyMenu[day] : { breakfast: '', lunch: '', dinner: '', snack: '' };
-    setTempMenuData(currentMenu);
-    setEditingMenuDay(day);
+  const startEditMenu = (dateKey: string) => {
+      const current = menus[dateKey] || { breakfast: '', lunch: '', dinner: '', snack: '' };
+      setTempMenuData(current);
+      setEditingMenuDateKey(dateKey);
   };
 
   const saveMenu = () => {
-    if (editingMenuDay) {
-      setWeeklyMenu(prev => ({
-        ...prev || {},
-        [editingMenuDay]: tempMenuData
-      }));
-      setEditingMenuDay(null);
+      if (editingMenuDateKey) {
+          setMenus(prev => ({
+              ...prev,
+              [editingMenuDateKey]: tempMenuData
+          }));
+          setEditingMenuDateKey(null);
+      }
+  };
+
+  // --- TODO LOGIC ---
+  const handleAddTodo = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+      const newTodo: TodoItem = {
+        id: Date.now().toString(),
+        text: e.currentTarget.value,
+        completed: false,
+        category: 'personal'
+      };
+      setTodos([...todos, newTodo]);
+      e.currentTarget.value = '';
     }
   };
+  const toggleTodo = (id: string) => setTodos(todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  const deleteTodo = (id: string) => setTodos(todos.filter(t => t.id !== id));
+
 
   return (
     <div className="flex flex-col gap-6 h-full overflow-y-auto p-1 max-w-7xl mx-auto w-full relative">
       {/* Section 1: Schedule */}
       <div className={`glass-panel p-6 rounded-3xl ${COLORS.macaron.blue.border} border-t-4 flex flex-col min-h-[450px]`}>
-        <div className="flex justify-between items-center mb-6">
-           <h2 className="text-2xl font-light text-slate-700 tracking-wide">Time Capsule</h2>
-           <span className="text-xs font-mono text-slate-400 bg-white/50 px-3 py-1.5 rounded-lg border border-white">May • Week 19</span>
+        {/* Header & Navigation */}
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+           <div className="flex items-center gap-4">
+             <h2 className="text-2xl font-light text-slate-700 tracking-wide">Time Capsule</h2>
+             <button onClick={jumpToToday} className="text-xs font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-md hover:bg-blue-100 transition-colors">
+                 TODAY
+             </button>
+           </div>
+           
+           <div className="flex items-center gap-3 bg-white/40 p-1.5 rounded-xl border border-white">
+             <button onClick={() => changeWeek(-1)} className="p-1 hover:bg-white rounded-lg transition-colors text-slate-500"><ChevronLeft size={18}/></button>
+             <span className="text-xs font-mono text-slate-600 font-bold min-w-[140px] text-center">
+                {currentMonthName} • Week {currentWeekNum}, {currentYear}
+             </span>
+             <button onClick={() => changeWeek(1)} className="p-1 hover:bg-white rounded-lg transition-colors text-slate-500"><ChevronRight size={18}/></button>
+           </div>
         </div>
         
         {/* Weekly Grid View */}
         <div className="grid grid-cols-1 md:grid-cols-7 gap-3 flex-1 overflow-hidden">
-          {DAYS.map(day => (
-            <div 
-              key={day} 
-              onClick={() => setSelectedDay(day)}
-              className={`rounded-2xl p-2 transition-all cursor-pointer flex flex-col gap-2 relative border-2 ${
-                selectedDay === day 
-                ? 'bg-white/40 border-amber-200/50 shadow-sm' 
-                : 'bg-transparent border-transparent hover:bg-white/20'
-              }`}
-            >
-               {/* Day Header */}
-               <div className={`text-center text-xs font-bold uppercase tracking-wider py-1 ${selectedDay === day ? 'text-amber-600' : 'text-slate-400'}`}>
-                 {day}
-               </div>
-
-               {/* Events Container */}
-               <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1 pb-2">
-                 {weeklySchedule[day]?.map(item => (
-                   <div 
-                    key={item.id} 
-                    onClick={(e) => { e.stopPropagation(); openEditEvent(item); }}
-                    className="bg-white/80 p-2.5 rounded-xl shadow-sm border border-white hover:border-amber-100 transition-colors group cursor-pointer relative"
-                   >
-                     <div className="text-[10px] font-mono text-slate-400 mb-0.5">{item.time}</div>
-                     <div className="text-xs text-slate-700 font-medium leading-snug">{item.activity}</div>
-                     <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Pencil size={10} className="text-slate-300" />
-                     </div>
+          {weekDays.map(date => {
+            const dateKey = formatDateKey(date);
+            const isSelected = selectedDateKey === dateKey;
+            const isToday = formatDateKey(new Date()) === dateKey;
+            const dayEvents = events[dateKey] || [];
+            
+            return (
+                <div 
+                  key={dateKey} 
+                  onClick={() => setSelectedDateKey(dateKey)}
+                  className={`rounded-2xl p-2 transition-all cursor-pointer flex flex-col gap-2 relative border-2 ${
+                    isSelected 
+                    ? 'bg-white/40 border-amber-200/50 shadow-sm' 
+                    : 'bg-transparent border-transparent hover:bg-white/20'
+                  }`}
+                >
+                   {/* Day Header */}
+                   <div className={`text-center py-1 flex flex-col items-center ${isSelected ? 'text-amber-600' : 'text-slate-400'}`}>
+                     <span className="text-[10px] font-bold uppercase tracking-wider">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                     <span className={`text-lg font-light leading-none ${isToday ? 'bg-amber-500 text-white w-7 h-7 flex items-center justify-center rounded-full shadow-md mt-1' : ''}`}>
+                         {date.getDate()}
+                     </span>
                    </div>
-                 ))}
-                 {(!weeklySchedule[day] || weeklySchedule[day].length === 0) && (
-                   <div className="flex-1 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      <div className="w-1 h-1 bg-slate-300 rounded-full"></div>
+    
+                   {/* Events Container */}
+                   <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1 pb-2 min-h-[100px]">
+                     {dayEvents.map(item => (
+                       <div 
+                        key={item.id} 
+                        onClick={(e) => { e.stopPropagation(); openEditEvent(item); }}
+                        className="bg-white/80 p-2.5 rounded-xl shadow-sm border border-white hover:border-amber-100 transition-colors group cursor-pointer relative"
+                       >
+                         <div className="text-[10px] font-mono text-slate-400 mb-0.5">{item.time}</div>
+                         <div className="text-xs text-slate-700 font-medium leading-snug">{item.activity}</div>
+                         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Pencil size={10} className="text-slate-300" />
+                         </div>
+                       </div>
+                     ))}
+                     {dayEvents.length === 0 && (
+                       <div className="flex-1 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <Plus size={12} className="text-slate-300"/>
+                       </div>
+                     )}
                    </div>
-                 )}
-               </div>
-            </div>
-          ))}
+                </div>
+            );
+          })}
         </div>
 
         {/* Add Event Input */}
         <div className="mt-4 pt-4 border-t border-slate-100/50 flex items-center gap-4">
            <div className="text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:block whitespace-nowrap">
-             Add to <span className="text-amber-500 font-bold">{selectedDay}</span>
+             Add to <span className="text-amber-500 font-bold">{new Date(selectedDateKey + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric'})}</span>
            </div>
            <div className="flex-1 relative">
              <input 
@@ -347,19 +441,20 @@ const Timetable: React.FC = () => {
 
         {/* Weekly Menu Horizontal Grid */}
         <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
-          {DAYS.map(day => {
-            const dayMenu = weeklyMenu ? weeklyMenu[day] : null;
-            const isEditing = editingMenuDay === day;
+          {weekDays.map(date => {
+            const dateKey = formatDateKey(date);
+            const dayMenu = menus[dateKey];
+            const isEditing = editingMenuDateKey === dateKey;
             
             return (
-              <div key={day} className="snap-center flex-shrink-0 w-64 bg-white/30 border border-white rounded-2xl p-4 hover:bg-white/60 transition-colors group relative">
+              <div key={dateKey} className="snap-center flex-shrink-0 w-64 bg-white/30 border border-white rounded-2xl p-4 hover:bg-white/60 transition-colors group relative">
                 <div className="flex justify-between items-center mb-4">
                   <div className="text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-                    {day}
+                    {date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric'})}
                   </div>
                   {!isEditing && (
                     <button 
-                      onClick={() => startEditMenu(day)}
+                      onClick={() => startEditMenu(dateKey)}
                       className="text-slate-300 hover:text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <Pencil size={14} />
@@ -387,7 +482,7 @@ const Timetable: React.FC = () => {
                      </div>
                      <div className="flex gap-2 mt-2">
                         <button onClick={saveMenu} className="flex-1 bg-emerald-500 text-white py-1 rounded text-xs font-medium hover:bg-emerald-600">Save</button>
-                        <button onClick={() => setEditingMenuDay(null)} className="flex-1 bg-slate-200 text-slate-600 py-1 rounded text-xs font-medium hover:bg-slate-300">Cancel</button>
+                        <button onClick={() => setEditingMenuDateKey(null)} className="flex-1 bg-slate-200 text-slate-600 py-1 rounded text-xs font-medium hover:bg-slate-300">Cancel</button>
                      </div>
                   </div>
                 ) : (
@@ -415,7 +510,7 @@ const Timetable: React.FC = () => {
                       <Utensils size={24} className="mb-2 opacity-50"/>
                       <span className="text-xs text-center">No menu generated</span>
                       <button 
-                        onClick={() => startEditMenu(day)}
+                        onClick={() => startEditMenu(dateKey)}
                         className="mt-2 text-xs text-emerald-500 font-medium hover:underline"
                       >
                         Add manually
