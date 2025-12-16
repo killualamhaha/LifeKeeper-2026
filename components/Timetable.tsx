@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Check, Utensils, Sparkles, ChefHat, Leaf, Coffee, Moon, Sun, Pencil, X, Save } from 'lucide-react';
 import { COLORS } from '../constants';
 import { ScheduleEvent, TodoItem, MealPlan } from '../types';
@@ -7,11 +7,7 @@ import { generateMealPlan } from '../services/geminiService';
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const CUISINES = ['Balanced', 'Mediterranean', 'Asian', 'Vegetarian', 'Quick & Easy', 'Keto'];
 
-const Timetable: React.FC = () => {
-  const [selectedDay, setSelectedDay] = useState('Mon');
-
-  // Initialize with some data for different days
-  const [weeklySchedule, setWeeklySchedule] = useState<Record<string, ScheduleEvent[]>>({
+const INITIAL_SCHEDULE: Record<string, ScheduleEvent[]> = {
     'Mon': [
       { id: '1', time: '08:00', activity: 'Morning Yoga' },
       { id: '2', time: '09:00', activity: 'Deep Work' },
@@ -35,18 +31,54 @@ const Timetable: React.FC = () => {
     'Sun': [
        { id: '10', time: '11:00', activity: 'Family Brunch' },
     ]
-  });
+};
 
-  const [todos, setTodos] = useState<TodoItem[]>([
+const INITIAL_TODOS: TodoItem[] = [
     { id: '1', text: 'Review quarterly goals', completed: false, category: 'work' },
     { id: '2', text: 'Buy hydrangeas', completed: true, category: 'personal' },
-  ]);
+];
 
-  // Food Menu State
+const Timetable: React.FC = () => {
+  const [selectedDay, setSelectedDay] = useState('Mon');
+
+  // -- STATE WITH PERSISTENCE --
+  
+  // Schedule
+  const [weeklySchedule, setWeeklySchedule] = useState<Record<string, ScheduleEvent[]>>(() => {
+    const saved = localStorage.getItem('timetable_schedule');
+    return saved ? JSON.parse(saved) : INITIAL_SCHEDULE;
+  });
+
+  // Todos
+  const [todos, setTodos] = useState<TodoItem[]>(() => {
+    const saved = localStorage.getItem('timetable_todos');
+    return saved ? JSON.parse(saved) : INITIAL_TODOS;
+  });
+
+  // Food Menu
+  const [weeklyMenu, setWeeklyMenu] = useState<Record<string, MealPlan> | null>(() => {
+      const saved = localStorage.getItem('timetable_menu');
+      return saved ? JSON.parse(saved) : null;
+  });
+
+  // Persistence Effects
+  useEffect(() => {
+    localStorage.setItem('timetable_schedule', JSON.stringify(weeklySchedule));
+  }, [weeklySchedule]);
+
+  useEffect(() => {
+    localStorage.setItem('timetable_todos', JSON.stringify(todos));
+  }, [todos]);
+
+  useEffect(() => {
+    localStorage.setItem('timetable_menu', JSON.stringify(weeklyMenu));
+  }, [weeklyMenu]);
+
+
+  // Food Menu UI State
   const [ingredients, setIngredients] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState('Balanced');
   const [isGeneratingMenu, setIsGeneratingMenu] = useState(false);
-  const [weeklyMenu, setWeeklyMenu] = useState<Record<string, MealPlan> | null>(null);
 
   // Edit States
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);

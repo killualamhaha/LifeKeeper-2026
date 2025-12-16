@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, PenTool, Lightbulb, Save, ChevronLeft, ChevronRight, Plus, CheckCircle2, Check, Briefcase } from 'lucide-react';
 import { COLORS } from '../constants';
 import { TargetData } from '../types';
@@ -10,22 +10,50 @@ interface DayPlan {
 
 const YearlyTargets: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'strategy' | 'calendar' | 'reflection'>('strategy');
-  const [strategyContent, setStrategyContent] = useState('');
-  
-  // Reflection State
-  const [ideasContent, setIdeasContent] = useState('');
-  const [businessContent, setBusinessContent] = useState('');
-  const [currentReflectionWeek, setCurrentReflectionWeek] = useState(19);
-  const [weeklyReflections, setWeeklyReflections] = useState<Record<number, string>>({});
 
-  // Calendar State
-  const [viewDate, setViewDate] = useState(new Date(2026, 4, 1)); // May 2026
-  const [monthlyStrategies, setMonthlyStrategies] = useState<Record<string, string>>({
-    '2026-4': 'Focus on launching the sustainable collection and increasing engagement on Instagram reels.'
+  // -- STATE WITH PERSISTENCE --
+
+  const [strategyContent, setStrategyContent] = useState(() => {
+    return localStorage.getItem('targets_strategy') || '';
   });
-  
-  // Update state to store objects instead of strings
-  const [dayPlans, setDayPlans] = useState<Record<string, DayPlan>>({});
+
+  const [monthlyStrategies, setMonthlyStrategies] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('targets_monthly_strategies');
+    return saved ? JSON.parse(saved) : { '2026-4': 'Focus on launching the sustainable collection and increasing engagement on Instagram reels.' };
+  });
+
+  const [dayPlans, setDayPlans] = useState<Record<string, DayPlan>>(() => {
+    const saved = localStorage.getItem('targets_day_plans');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [weeklyReflections, setWeeklyReflections] = useState<Record<number, string>>(() => {
+      const saved = localStorage.getItem('targets_weekly_reflections');
+      return saved ? JSON.parse(saved) : {};
+  });
+
+  const [ideasContent, setIdeasContent] = useState(() => {
+      return localStorage.getItem('targets_ideas') || '';
+  });
+
+  const [businessContent, setBusinessContent] = useState(() => {
+      return localStorage.getItem('targets_business') || '';
+  });
+
+  // Persistence Effects
+  useEffect(() => { localStorage.setItem('targets_strategy', strategyContent); }, [strategyContent]);
+  useEffect(() => { localStorage.setItem('targets_monthly_strategies', JSON.stringify(monthlyStrategies)); }, [monthlyStrategies]);
+  useEffect(() => { localStorage.setItem('targets_day_plans', JSON.stringify(dayPlans)); }, [dayPlans]);
+  useEffect(() => { localStorage.setItem('targets_weekly_reflections', JSON.stringify(weeklyReflections)); }, [weeklyReflections]);
+  useEffect(() => { localStorage.setItem('targets_ideas', ideasContent); }, [ideasContent]);
+  useEffect(() => { localStorage.setItem('targets_business', businessContent); }, [businessContent]);
+
+
+  // Reflection State (Transient)
+  const [currentReflectionWeek, setCurrentReflectionWeek] = useState(19);
+
+  // Calendar State (Transient)
+  const [viewDate, setViewDate] = useState(new Date(2026, 4, 1)); // May 2026
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   // Calendar Helpers
@@ -96,7 +124,7 @@ const YearlyTargets: React.FC = () => {
           <div className="h-full flex flex-col">
             <div className="mb-4 p-4 bg-purple-50 rounded-xl border border-purple-100 text-sm text-purple-800">
               <h3 className="font-semibold mb-1">Strategic Focus 2026</h3>
-              <p>Define your core pillars. What does success look like this year?</p>
+              <p>Define your core pillars. What does success look like this year? (Auto-saved)</p>
             </div>
             <textarea 
               className="flex-1 w-full bg-white/50 rounded-2xl p-6 resize-none focus:outline-none focus:ring-2 focus:ring-purple-200 text-slate-700 leading-relaxed text-lg"
@@ -104,11 +132,6 @@ const YearlyTargets: React.FC = () => {
               value={strategyContent}
               onChange={(e) => setStrategyContent(e.target.value)}
             />
-            <div className="mt-4 flex justify-end">
-              <button className="flex items-center gap-2 px-6 py-2 bg-purple-500 text-white rounded-full hover:bg-purple-600 transition-colors shadow-lg shadow-purple-200">
-                <Save size={18} /> Save Strategy
-              </button>
-            </div>
           </div>
         );
       case 'calendar':

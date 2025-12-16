@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, BookOpen, AlertCircle, ArrowUpRight, ArrowDownRight, Activity, Plus, Trash2, Save, X, Pencil } from 'lucide-react';
 import { COLORS } from '../constants';
 
@@ -21,8 +21,26 @@ interface ResearchItem {
 }
 
 const Finance: React.FC = () => {
-  const [stocks, setStocks] = useState<StockItem[]>([]);
-  const [research, setResearch] = useState<ResearchItem[]>([]);
+  // -- STATE WITH PERSISTENCE --
+  const [stocks, setStocks] = useState<StockItem[]>(() => {
+    const saved = localStorage.getItem('finance_stocks');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [research, setResearch] = useState<ResearchItem[]>(() => {
+    const saved = localStorage.getItem('finance_research');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Persistence Effects
+  useEffect(() => {
+    localStorage.setItem('finance_stocks', JSON.stringify(stocks));
+  }, [stocks]);
+
+  useEffect(() => {
+    localStorage.setItem('finance_research', JSON.stringify(research));
+  }, [research]);
+
 
   // Add/Edit Stock State
   const [isAddingStock, setIsAddingStock] = useState(false);
@@ -193,12 +211,12 @@ const Finance: React.FC = () => {
                 </div>
                 <div className="flex justify-between items-end">
                    <div>
-                      <div className="text-xs text-slate-400 mb-0.5">Price</div>
-                      <div className="font-mono text-slate-700">${stock.price.toLocaleString()}</div>
+                       <div className="text-xs text-slate-400 mb-0.5">Price</div>
+                       <div className="font-mono text-slate-700">${stock.price.toLocaleString()}</div>
                    </div>
                    <div className="text-right">
-                      <div className="text-xs text-slate-400 mb-0.5">Value</div>
-                      <div className="font-mono text-slate-700">${(stock.price * stock.shares).toLocaleString()}</div>
+                       <div className="text-xs text-slate-400 mb-0.5">Value</div>
+                       <div className="font-mono text-slate-700">${(stock.price * stock.shares).toLocaleString()}</div>
                    </div>
                 </div>
                 {stock.remarks && (

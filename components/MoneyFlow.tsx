@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { ArrowUpRight, ArrowDownLeft, Wallet, Plus, X, Save, Trash2, Pencil, Heart, PiggyBank, TrendingUp, Calendar, Landmark, PieChart as PieChartIcon, LayoutList, CreditCard } from 'lucide-react';
 import { Transaction } from '../types';
@@ -37,11 +37,38 @@ interface BankAccount {
   type: 'checking' | 'savings' | 'investment';
 }
 
+const INITIAL_ACCOUNTS: BankAccount[] = [
+    { id: '1', name: 'Main Vault', balance: 12450, remarks: 'Primary Checking', type: 'checking' },
+    { id: '2', name: 'Growth Nest', balance: 8200, remarks: 'Emergency Fund', type: 'savings' },
+    { id: '3', name: 'Ventures', balance: 15300, remarks: 'Investment Portfolio', type: 'investment' },
+];
+
 const COLORS_LIST = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#0ea5e9'];
 
 const MoneyFlow: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'yearly' | 'banking'>('overview');
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+
+  // -- STATE WITH PERSISTENCE --
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('moneyflow_transactions');
+    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+  });
+
+  const [accounts, setAccounts] = useState<BankAccount[]>(() => {
+    const saved = localStorage.getItem('moneyflow_accounts');
+    return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+  });
+
+  // Persistence Effects
+  useEffect(() => {
+    localStorage.setItem('moneyflow_transactions', JSON.stringify(transactions));
+  }, [transactions]);
+
+  useEffect(() => {
+    localStorage.setItem('moneyflow_accounts', JSON.stringify(accounts));
+  }, [accounts]);
+
+
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   
@@ -49,11 +76,6 @@ const MoneyFlow: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('2026-05');
   
   // Banking State
-  const [accounts, setAccounts] = useState<BankAccount[]>([
-    { id: '1', name: 'Main Vault', balance: 12450, remarks: 'Primary Checking', type: 'checking' },
-    { id: '2', name: 'Growth Nest', balance: 8200, remarks: 'Emergency Fund', type: 'savings' },
-    { id: '3', name: 'Ventures', balance: 15300, remarks: 'Investment Portfolio', type: 'investment' },
-  ]);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [newAccount, setNewAccount] = useState<Partial<BankAccount>>({ name: '', balance: 0, remarks: '', type: 'savings' });
