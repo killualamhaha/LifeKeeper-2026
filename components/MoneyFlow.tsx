@@ -3,7 +3,6 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ArrowUpRight, ArrowDownLeft, Wallet, Plus, X, Save, Trash2, Pencil, Heart, PiggyBank, TrendingUp, Calendar, Landmark, PieChart as PieChartIcon, LayoutList, CreditCard } from 'lucide-react';
 import { Transaction } from '../types';
 
-// Seed data to populate the chart initially if nothing is in local storage
 const INITIAL_TRANSACTIONS: Transaction[] = [
   { id: '1', date: '2026-01-15', description: 'Monthly Salary', amount: 4000, type: 'income', category: 'Work' },
   { id: '2', date: '2026-01-20', description: 'Rent & Utilities', amount: 2400, type: 'expense', category: 'Living' },
@@ -11,6 +10,7 @@ const INITIAL_TRANSACTIONS: Transaction[] = [
   { id: '11', date: '2026-04-20', description: 'Rent & Utilities', amount: 1200, type: 'expense', category: 'Living' },
   { id: '13', date: '2026-05-12', description: 'Freelance Project X', amount: 1200, type: 'income', category: 'Work' },
   { id: '14', date: '2026-05-14', description: 'Grocery - Whole Foods', amount: 154, type: 'expense', category: 'Food' },
+  { id: '15', date: '2026-05-20', description: 'Community Fund', amount: 100, type: 'donation', category: 'Charity' },
 ];
 
 interface BankAccount {
@@ -34,22 +34,22 @@ const MoneyFlow: React.FC = () => {
 
   // --- STATE WITH PERSISTENCE ---
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('moneyflow_transactions_v3');
+    const saved = localStorage.getItem('moneyflow_transactions_v5');
     return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
   });
 
   const [accounts, setAccounts] = useState<BankAccount[]>(() => {
-    const saved = localStorage.getItem('moneyflow_accounts_v3');
+    const saved = localStorage.getItem('moneyflow_accounts_v5');
     return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
   });
 
-  // Persistence Effects (Auto-save whenever state changes)
+  // Global Auto-Save Effect
   useEffect(() => {
-    localStorage.setItem('moneyflow_transactions_v3', JSON.stringify(transactions));
+    localStorage.setItem('moneyflow_transactions_v5', JSON.stringify(transactions));
   }, [transactions]);
 
   useEffect(() => {
-    localStorage.setItem('moneyflow_accounts_v3', JSON.stringify(accounts));
+    localStorage.setItem('moneyflow_accounts_v5', JSON.stringify(accounts));
   }, [accounts]);
 
   // UI States
@@ -57,16 +57,16 @@ const MoneyFlow: React.FC = () => {
   const [editId, setEditId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   
-  // Banking State
+  // Banking UI State
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [newAccount, setNewAccount] = useState<Partial<BankAccount>>({ name: '', balance: 0, remarks: '', type: 'savings' });
 
-  // Form State for Transactions
-  const [formData, setFormData] = useState<Partial<Transaction>>({
+  // Form State for Transactions - Use any/string for amount to allow empty input in UI
+  const [formData, setFormData] = useState<any>({
     date: new Date().toISOString().split('T')[0],
     description: '',
-    amount: 0,
+    amount: '', // Initialized as empty string so it's deletable
     type: 'expense',
     category: ''
   });
@@ -77,17 +77,16 @@ const MoneyFlow: React.FC = () => {
   }, [transactions, selectedMonth]);
 
   const chartData = useMemo(() => {
-    const [yearStr] = selectedMonth.split('-');
-    const year = parseInt(yearStr);
+    const year = parseInt(selectedMonth.split('-')[0]);
     const monthsData: Record<number, { name: string; income: number; expense: number }> = {};
     for(let i=0; i<12; i++) {
         const d = new Date(year, i, 1);
         monthsData[i] = { name: d.toLocaleString('default', { month: 'short' }), income: 0, expense: 0 };
     }
     transactions.forEach(t => {
-      const date = new Date(t.date);
-      if (date.getFullYear() === year) {
-          const m = date.getMonth();
+      const d = new Date(t.date);
+      if (d.getFullYear() === year) {
+          const m = d.getMonth();
           if (t.type === 'income') monthsData[m].income += t.amount;
           else monthsData[m].expense += t.amount;
       }
@@ -98,60 +97,59 @@ const MoneyFlow: React.FC = () => {
   const yearlyStats = useMemo(() => {
     const year = parseInt(selectedMonth.split('-')[0]);
     let income = 0; let expense = 0; let donation = 0;
-    const categoryBreakdown: Record<string, number> = {};
+    const breakdown: Record<string, number> = {};
     transactions.forEach(t => {
       if (new Date(t.date).getFullYear() === year) {
         if (t.type === 'income') income += t.amount;
         else if (t.type === 'donation') donation += t.amount;
         else {
           expense += t.amount;
-          categoryBreakdown[t.category] = (categoryBreakdown[t.category] || 0) + t.amount;
+          breakdown[t.category] = (breakdown[t.category] || 0) + t.amount;
         }
       }
     });
-    const categoryData = Object.keys(categoryBreakdown).map((name) => ({ name, value: categoryBreakdown[name] })).sort((a,b) => b.value - a.value);
+    const categoryData = Object.keys(breakdown).map(name => ({ name, value: breakdown[name] })).sort((a,b) => b.value - a.value);
     return { income, expense, donation, savings: income - (expense + donation), categoryData };
   }, [transactions, selectedMonth]);
 
   const monthlySummary = useMemo(() => {
-    let totalIncome = 0; let totalExpense = 0; let totalDonation = 0;
+    let inc = 0; let exp = 0; let don = 0;
     filteredTransactions.forEach(t => {
-      if (t.type === 'income') totalIncome += t.amount;
-      else if (t.type === 'donation') totalDonation += t.amount;
-      else totalExpense += t.amount;
+      if (t.type === 'income') inc += t.amount;
+      else if (t.type === 'donation') don += t.amount;
+      else exp += t.amount;
     });
-    return { income: totalIncome, savings: totalIncome - (totalExpense + totalDonation), donation: totalDonation };
+    return { income: inc, expense: exp, donation: don, savings: inc - (exp + don) };
   }, [filteredTransactions]);
 
-  const totalBankBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
+  const totalNetWorth = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
   // --- HANDLERS ---
   const handleOpenAdd = () => {
-    setFormData({ date: new Date().toISOString().split('T')[0], description: '', amount: 0, type: 'expense', category: '' });
+    setFormData({ date: new Date().toISOString().split('T')[0], description: '', amount: '', type: 'expense', category: '' });
     setEditId(null);
     setIsEditing(true);
   };
 
   const handleEdit = (t: Transaction) => {
-    setFormData({ ...t });
+    setFormData({ ...t, amount: t.amount.toString() });
     setEditId(t.id);
     setIsEditing(true);
   };
 
   const handleDelete = (id: string) => {
-    // Immediate state update triggers useEffect auto-save
     setTransactions(prev => prev.filter(t => t.id !== id));
     if (editId === id) setIsEditing(false);
   };
 
   const handleSave = () => {
-    if (!formData.description || !formData.amount || !formData.date) return;
+    if (!formData.description || formData.amount === '' || !formData.date) return;
     const payload: Transaction = {
       id: editId || Date.now().toString(),
       date: formData.date!,
       description: formData.description!,
-      amount: Number(formData.amount),
-      type: formData.type as 'income' | 'expense' | 'donation',
+      amount: parseFloat(formData.amount) || 0,
+      type: formData.type as any,
       category: formData.category || 'General'
     };
     if (editId) {
@@ -179,8 +177,14 @@ const MoneyFlow: React.FC = () => {
     }
   }
 
+  const deleteBankAccount = (id: string) => {
+      setAccounts(prev => prev.filter(a => a.id !== id));
+      setIsBankModalOpen(false);
+  }
+
   return (
     <div className="h-full flex flex-col gap-4 overflow-hidden p-1 relative">
+      {/* Tab Switcher */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-shrink-0">
          <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-white shadow-sm">
             <button onClick={() => setActiveTab('overview')} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'overview' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-white/60'}`}><LayoutList size={16} /> Monthly</button>
@@ -195,6 +199,7 @@ const MoneyFlow: React.FC = () => {
          )}
       </div>
 
+      {/* --- MONTHLY OVERVIEW --- */}
       {activeTab === 'overview' && (
         <div className="flex-1 flex flex-col gap-6 overflow-y-auto animate-in fade-in duration-300 pb-20">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-shrink-0">
@@ -212,9 +217,9 @@ const MoneyFlow: React.FC = () => {
                 </div>
             </div>
 
-            <div className="glass-panel rounded-3xl p-6 pt-6 pb-8 relative overflow-hidden flex flex-col min-h-[350px] flex-shrink-0">
+            <div className="glass-panel rounded-3xl p-6 pt-6 pb-8 flex flex-col min-h-[350px] flex-shrink-0">
                 <h2 className="text-xl font-light text-slate-700 mb-6 flex items-center gap-2"><Wallet className="text-emerald-500" /> Cashflow Rhythm</h2>
-                <div className="w-full flex-1 min-h-0">
+                <div className="w-full flex-1">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
@@ -235,12 +240,12 @@ const MoneyFlow: React.FC = () => {
             <div className="glass-panel rounded-3xl p-6 flex-1 flex flex-col min-h-[400px]">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-slate-800">Transaction History</h3>
-                    <button onClick={handleOpenAdd} className="px-4 py-2 bg-slate-700 text-white rounded-xl text-sm font-medium hover:bg-slate-800 shadow-lg shadow-slate-300/50 flex items-center gap-2"><Plus size={16} /> New Record</button>
+                    <button onClick={handleOpenAdd} className="px-4 py-2 bg-slate-700 text-white rounded-xl text-sm font-medium hover:bg-slate-800 shadow-lg flex items-center gap-2"><Plus size={16} /> New Record</button>
                 </div>
                 <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                    {filteredTransactions.length === 0 && <div className="text-center py-10 text-slate-400">No transactions found for {selectedMonth}.</div>}
-                    {[...filteredTransactions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime() || a.id.localeCompare(b.id)).map(t => (
-                        <div key={t.id} className="flex items-center justify-between group p-3 hover:bg-white/40 rounded-2xl transition-all">
+                    {filteredTransactions.length === 0 && <div className="text-center py-10 text-slate-400">No transactions recorded for this period.</div>}
+                    {[...filteredTransactions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(t => (
+                        <div key={t.id} className="flex items-center justify-between p-3 bg-white/30 hover:bg-white/60 rounded-2xl transition-all border border-transparent hover:border-slate-100">
                             <div className="flex items-center gap-4">
                                 <div className={`p-3.5 rounded-full ${t.type === 'income' ? 'bg-emerald-100 text-emerald-500' : 'bg-rose-100 text-rose-500'}`}>{t.type === 'income' ? <ArrowDownLeft size={20}/> : <ArrowUpRight size={20}/>}</div>
                                 <div>
@@ -248,11 +253,11 @@ const MoneyFlow: React.FC = () => {
                                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t.date} • {t.category}</div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-4 md:gap-8">
                                 <div className="text-sm font-bold font-mono text-slate-700">{t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()}</div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-blue-500 bg-white/80 shadow-sm rounded-full transition-colors"><Pencil size={14}/></button>
-                                    <button onClick={() => handleDelete(t.id)} className="p-1.5 text-slate-400 hover:text-red-500 bg-white/80 shadow-sm rounded-full transition-colors"><Trash2 size={14}/></button>
+                                    <button onClick={() => handleEdit(t)} className="p-2 text-slate-400 hover:text-blue-500 bg-white/80 rounded-full shadow-sm transition-colors"><Pencil size={14}/></button>
+                                    <button onClick={() => handleDelete(t.id)} className="p-2 text-slate-400 hover:text-red-500 bg-white/80 rounded-full shadow-sm transition-colors"><Trash2 size={14}/></button>
                                 </div>
                             </div>
                         </div>
@@ -262,46 +267,166 @@ const MoneyFlow: React.FC = () => {
         </div>
       )}
 
+      {/* --- YEARLY REPORT --- */}
+      {activeTab === 'yearly' && (
+          <div className="flex-1 flex flex-col gap-6 overflow-y-auto pb-20 animate-in slide-in-from-right-4 duration-300">
+             <div className="glass-panel p-8 rounded-[2.5rem] bg-white/40">
+                <h2 className="text-3xl font-light text-slate-800 mb-8">{selectedMonth.split('-')[0]} Annual Report</h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                   <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+                      <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mb-2">Total Income</div>
+                      <div className="text-3xl font-light text-slate-800">${yearlyStats.income.toLocaleString()}</div>
+                   </div>
+                   <div className="p-6 bg-rose-50 rounded-3xl border border-rose-100">
+                      <div className="text-[10px] text-rose-600 font-bold uppercase tracking-widest mb-2">Total Expenses</div>
+                      <div className="text-3xl font-light text-slate-800">${yearlyStats.expense.toLocaleString()}</div>
+                   </div>
+                   <div className="p-6 bg-amber-50 rounded-3xl border border-amber-100">
+                      <div className="text-[10px] text-amber-600 font-bold uppercase tracking-widest mb-2">Net Savings</div>
+                      <div className="text-3xl font-light text-slate-800">${yearlyStats.savings.toLocaleString()}</div>
+                   </div>
+                   <div className="p-6 bg-purple-50 rounded-3xl border border-purple-100">
+                      <div className="text-[10px] text-purple-600 font-bold uppercase tracking-widest mb-2">Savings Rate</div>
+                      <div className="text-3xl font-light text-slate-800">
+                        {yearlyStats.income > 0 ? Math.round((yearlyStats.savings / yearlyStats.income) * 100) : 0}%
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 <div className="glass-panel p-8 rounded-[2.5rem] h-[400px] flex flex-col">
+                    <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><PieChartIcon size={20}/> Categories</h3>
+                    <div className="flex-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={yearlyStats.categoryData} cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={5} dataKey="value" startAngle={90} endAngle={-270}>
+                                    {yearlyStats.categoryData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS_LIST[index % COLORS_LIST.length]} strokeWidth={0} />)}
+                                </Pie>
+                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={(v: number) => `$${v.toLocaleString()}`} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                 </div>
+
+                 <div className="glass-panel p-8 rounded-[2.5rem] h-[400px] flex flex-col">
+                    <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2">Monthly Inflow/Outflow</h3>
+                    <div className="flex-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                 </div>
+             </div>
+             
+             <div className="glass-panel p-8 rounded-[2.5rem]">
+                <h3 className="font-bold text-slate-700 mb-6">Spending Breakdown</h3>
+                <div className="space-y-3">
+                    {yearlyStats.categoryData.map((cat, idx) => (
+                        <div key={cat.name} className="flex items-center justify-between p-4 rounded-2xl bg-white/40 border border-white">
+                            <div className="flex items-center gap-4">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS_LIST[idx % COLORS_LIST.length] }} />
+                                <span className="font-medium text-slate-700">{cat.name}</span>
+                            </div>
+                            <div className="font-mono text-slate-600">${cat.value.toLocaleString()}</div>
+                        </div>
+                    ))}
+                </div>
+             </div>
+          </div>
+      )}
+
+      {/* --- BANKING --- */}
+      {activeTab === 'banking' && (
+          <div className="flex-1 flex flex-col gap-6 overflow-y-auto pb-20 animate-in slide-in-from-right-4 duration-300">
+             <div className="glass-panel p-8 rounded-[2.5rem] bg-indigo-50/40 border-indigo-100 flex items-center justify-between">
+                 <div>
+                    <h2 className="text-3xl font-light text-slate-800 mb-2">Total Net Worth</h2>
+                    <div className="text-5xl font-extralight text-slate-900 tracking-tight">${totalNetWorth.toLocaleString()}</div>
+                 </div>
+                 <div className="p-6 bg-indigo-100 text-indigo-600 rounded-3xl shadow-inner"><Landmark size={48} /></div>
+             </div>
+
+             <div className="flex justify-between items-center px-2">
+                <h3 className="text-xl font-bold text-slate-700">Account Vaults</h3>
+                <button onClick={() => openBankModal()} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl shadow-lg hover:bg-indigo-700 flex items-center gap-2 font-medium transition-all"><Plus size={18}/> New Account</button>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {accounts.map(acc => (
+                    <div key={acc.id} onClick={() => openBankModal(acc)} className="group cursor-pointer relative p-6 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300">
+                        <div className="flex justify-between items-start mb-8">
+                            <div className={`p-3 rounded-2xl ${acc.type === 'checking' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}><CreditCard size={24} /></div>
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{acc.type}</div>
+                        </div>
+                        <div>
+                            <h4 className="text-lg font-medium text-slate-700 mb-1">{acc.name}</h4>
+                            <div className="text-3xl font-light text-slate-900">${acc.balance.toLocaleString()}</div>
+                            {acc.remarks && <p className="text-xs text-slate-400 mt-2 truncate">{acc.remarks}</p>}
+                        </div>
+                    </div>
+                ))}
+             </div>
+          </div>
+      )}
+
       {/* --- MODALS --- */}
       {isEditing && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/10 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 w-full max-w-md border border-slate-100 scale-100 transition-transform">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/10 backdrop-blur-md p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 w-full max-w-md border border-slate-100">
               <div className="flex justify-between items-center mb-6">
-                 <h3 className="text-xl font-light text-slate-700">{editId ? 'Edit Transaction' : 'New Transaction'}</h3>
+                 <h3 className="text-xl font-light text-slate-700">{editId ? 'Edit Record' : 'New Record'}</h3>
                  <button onClick={() => setIsEditing(false)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
               </div>
               <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
-                  {['income', 'expense', 'donation'].map((type) => (
-                    <button key={type} onClick={() => setFormData({...formData, type: type as any})} className={`flex-1 py-2 text-sm font-medium rounded-xl transition-all capitalize ${formData.type === type ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>{type}</button>
+                  {['income', 'expense', 'donation'].map((t) => (
+                    <button key={t} onClick={() => setFormData({...formData, type: t as any})} className={`flex-1 py-2 text-sm font-medium rounded-xl transition-all capitalize ${formData.type === t ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>{t}</button>
                   ))}
               </div>
               <div className="space-y-4">
-                 <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Description</label><input autoFocus className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-200" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
+                 <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Description</label><input autoFocus className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-100" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
                  <div className="grid grid-cols-2 gap-4">
-                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Amount ($)</label><input type="number" className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-200" value={formData.amount} onChange={e => setFormData({...formData, amount: parseFloat(e.target.value) || 0})} /></div>
-                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Date</label><input type="date" className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-200" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Amount ($)</label>
+                        <input 
+                            type="number" 
+                            className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-100" 
+                            placeholder="0.00"
+                            value={formData.amount} 
+                            onChange={e => setFormData({...formData, amount: e.target.value})} 
+                        />
+                    </div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Date</label><input type="date" className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-100" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
                  </div>
-                 <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Category</label><input className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-200" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} list="categories" /></div>
-                 <button onClick={handleSave} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-medium shadow-lg hover:bg-slate-700 transition-colors flex justify-center items-center gap-2 mt-4"><Save size={18} /> Save Record</button>
+                 <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Category</label><input className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-100" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} list="categories" /><datalist id="categories"><option value="Work"/><option value="Living"/><option value="Food"/><option value="Tech"/><option value="Charity"/></datalist></div>
+                 <button onClick={handleSave} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-medium shadow-lg flex justify-center items-center gap-2 mt-4 hover:bg-slate-700 transition-colors"><Save size={18} /> Save Record</button>
               </div>
            </div>
         </div>
       )}
-      
-      {/* Banking Modal Simplified logic for brevity, matches existing pattern */}
+
       {isBankModalOpen && (
-         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/10 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/10 backdrop-blur-md p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 w-full max-w-md border border-slate-100">
-                <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-light text-slate-700">Account Vault</h3><button onClick={() => setIsBankModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button></div>
+                <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-light text-slate-700">{editingAccount ? 'Edit Account' : 'New Account'}</h3><button onClick={() => setIsBankModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button></div>
                 <div className="space-y-4">
-                   <div><label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Bank Name</label><input className="w-full p-3 bg-slate-50 rounded-xl" value={newAccount.name} onChange={(e) => setNewAccount({...newAccount, name: e.target.value})} /></div>
-                   <button onClick={saveBankAccount} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-medium">Save Account</button>
+                   <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Bank Name</label><input className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-indigo-100" value={newAccount.name} onChange={e => setNewAccount({...newAccount, name: e.target.value})} /></div>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Balance ($)</label><input type="number" className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-indigo-100" value={newAccount.balance} onChange={e => setNewAccount({...newAccount, balance: parseFloat(e.target.value) || 0})} /></div>
+                      <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Type</label><select className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-indigo-100" value={newAccount.type} onChange={e => setNewAccount({...newAccount, type: e.target.value as any})}><option value="checking">Checking</option><option value="savings">Savings</option><option value="investment">Investment</option></select></div>
+                   </div>
+                   <button onClick={saveBankAccount} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-medium shadow-lg mt-4 hover:bg-indigo-700 transition-colors">Save Account</button>
+                   {editingAccount && <button onClick={() => deleteBankAccount(editingAccount.id)} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-widest hover:text-red-600">Remove Account</button>}
                 </div>
             </div>
          </div>
       )}
-
-      {/* Yearly Report and Banking tabs omitted for brevity but they share the same auto-save transactions state */}
     </div>
   );
 };
