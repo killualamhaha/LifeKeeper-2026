@@ -13,8 +13,8 @@ const INITIAL_ITEMS: WishlistItem[] = [
 interface WishlistItemComponentProps {
     item: WishlistItem;
     isEditing: boolean;
-    editForm: Partial<WishlistItem>;
-    setEditForm: (form: Partial<WishlistItem>) => void;
+    editForm: any;
+    setEditForm: (form: any) => void;
     onEdit: (item: WishlistItem) => void;
     onSave: () => void;
     onCancel: () => void;
@@ -28,25 +28,31 @@ const SmallJoy: React.FC<WishlistItemComponentProps> = ({
     if (isEditing) {
         return (
             <div className="p-4 rounded-2xl bg-white border-2 border-amber-200 shadow-lg flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200">
-                <input 
-                    className="text-slate-700 font-medium bg-slate-50 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-200 w-full"
-                    value={editForm.title || ''} 
-                    onChange={e => setEditForm({...editForm, title: e.target.value})}
-                    placeholder="Experience Title"
-                    autoFocus
-                />
-                <div className="flex items-center gap-2">
-                    <span className="text-slate-400 text-sm">$</span>
-                    <input 
-                        type="number"
-                        className="text-slate-700 font-mono text-sm bg-slate-50 p-2 rounded-lg w-24 focus:outline-none focus:ring-2 focus:ring-amber-200"
-                        value={editForm.cost || 0} 
-                        onChange={e => setEditForm({...editForm, cost: Number(e.target.value)})}
-                        placeholder="Cost"
-                    />
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Experience Title</label>
+                  <input 
+                      className="text-slate-700 font-medium bg-slate-50 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-200 w-full"
+                      value={editForm.title || ''} 
+                      onChange={e => setEditForm({...editForm, title: e.target.value})}
+                      placeholder="e.g. Pottery Class"
+                      autoFocus
+                  />
                 </div>
-                <div className="flex justify-between items-center mt-2">
-                    <button onClick={() => onDelete(item.id)} className="text-xs text-red-400 hover:text-red-500 hover:underline px-2">Delete</button>
+                <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Estimated Cost</label>
+                    <div className="flex items-center gap-2">
+                        <span className="text-slate-400 text-sm">$</span>
+                        <input 
+                            type="number"
+                            className="text-slate-700 font-mono text-sm bg-slate-50 p-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-amber-200"
+                            value={editForm.cost} 
+                            onChange={e => setEditForm({...editForm, cost: e.target.value})}
+                            placeholder="0"
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
+                    <button onClick={() => onDelete(item.id)} className="text-[10px] font-bold text-red-400 hover:text-red-500 uppercase tracking-widest px-2 transition-colors">Delete</button>
                     <div className="flex gap-2">
                         <button onClick={onSave} className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors shadow-sm"><Save size={16}/></button>
                         <button onClick={onCancel} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors"><X size={16}/></button>
@@ -76,8 +82,8 @@ const SmallJoy: React.FC<WishlistItemComponentProps> = ({
                   <CheckCircle2 size={24} className={item.completed ? 'fill-emerald-100' : ''} />
                 </button>
             </div>
-            <h4 className={`font-medium ${item.completed ? 'text-slate-500 line-through' : 'text-slate-700'}`}>{item.title}</h4>
-            {item.cost ? <div className="text-xs font-mono text-slate-400 mt-2">${item.cost}</div> : <div className="h-4 mt-2"></div>}
+            <h4 className={`font-medium ${item.completed ? 'text-slate-500 line-through' : 'text-slate-700'}`}>{item.title || 'Untitled Experience'}</h4>
+            {item.cost !== undefined ? <div className="text-xs font-mono text-slate-400 mt-2">${item.cost.toLocaleString()}</div> : <div className="h-4 mt-2"></div>}
         </div>
     );
 };
@@ -127,7 +133,7 @@ const LongTermGoal: React.FC<WishlistItemComponentProps> = ({
                   <Star size={28} className={item.completed ? 'fill-amber-400' : 'fill-purple-100'} strokeWidth={item.completed ? 0 : 1.5} />
                 </button>
                 <div className="flex-1 pr-8">
-                  <h3 className={`text-xl font-light leading-snug ${item.completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{item.title}</h3>
+                  <h3 className={`text-xl font-light leading-snug ${item.completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{item.title || 'Untitled Vision'}</h3>
                   <p className={`text-xs mt-1 uppercase tracking-wider font-semibold ${item.completed ? 'text-slate-300' : 'text-purple-400'}`}>Long Term Vision</p>
                 </div>
             </div>
@@ -144,18 +150,18 @@ const LongTermGoal: React.FC<WishlistItemComponentProps> = ({
 const Wishlist: React.FC = () => {
   // -- STATE WITH PERSISTENCE --
   const [items, setItems] = useState<WishlistItem[]>(() => {
-    const saved = localStorage.getItem('wishlist_items');
+    const saved = localStorage.getItem('wishlist_items_v3');
     return saved ? JSON.parse(saved) : INITIAL_ITEMS;
   });
 
-  // Persistence Effects
+  // Global Persistence Effect
   useEffect(() => {
-    localStorage.setItem('wishlist_items', JSON.stringify(items));
+    localStorage.setItem('wishlist_items_v3', JSON.stringify(items));
   }, [items]);
 
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<WishlistItem>>({});
+  const [editForm, setEditForm] = useState<any>({});
 
   const toggleComplete = (id: string) => {
     setItems(items.map(i => i.id === id ? { ...i, completed: !i.completed } : i));
@@ -163,13 +169,15 @@ const Wishlist: React.FC = () => {
 
   const handleEdit = (item: WishlistItem) => {
     setEditingId(item.id);
-    setEditForm({ ...item });
+    setEditForm({ ...item, cost: item.cost === undefined ? '' : item.cost.toString() });
   };
 
   const handleSave = () => {
-    if (editForm.title?.trim()) {
-        setItems(items.map(i => i.id === editingId ? { ...i, ...editForm } as WishlistItem : i));
-    }
+    setItems(items.map(i => i.id === editingId ? { 
+        ...i, 
+        ...editForm,
+        cost: editForm.cost === '' ? undefined : parseFloat(editForm.cost)
+    } : i));
     setEditingId(null);
     setEditForm({});
   };
@@ -185,9 +193,9 @@ const Wishlist: React.FC = () => {
           title: '',
           type: 'small_joy',
           completed: false,
-          cost: 0
+          cost: undefined 
       };
-      setItems([...items, newItem]);
+      setItems(prev => [...prev, newItem]);
       handleEdit(newItem);
   };
 
@@ -198,28 +206,37 @@ const Wishlist: React.FC = () => {
         type: 'long_term',
         completed: false
     };
-    setItems([...items, newItem]);
+    setItems(prev => [...prev, newItem]);
     handleEdit(newItem);
   };
 
   const deleteItem = (id: string) => {
-      setItems(items.filter(i => i.id !== id));
+      setItems(prev => prev.filter(i => i.id !== id));
       if (editingId === id) setEditingId(null);
   }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full p-1 overflow-y-auto">
-      {/* Left: Small Joys (Access) */}
+      {/* Left: Small Joys */}
       <div className="lg:col-span-5 flex flex-col gap-4">
-        <div className="glass-panel p-6 rounded-3xl sticky top-0 z-10">
-          <h2 className="text-2xl font-light text-slate-700 flex items-center gap-2">
-            <span className="bg-amber-100 p-2 rounded-lg text-amber-600"><Gift size={20}/></span>
-            Small Joys
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">Experiences within reach.</p>
+        <div className="glass-panel p-6 rounded-3xl sticky top-0 z-10 flex justify-between items-center bg-white/80 backdrop-blur-md">
+          <div>
+            <h2 className="text-2xl font-light text-slate-700 flex items-center gap-2">
+              <span className="bg-amber-100 p-2 rounded-lg text-amber-600"><Gift size={20}/></span>
+              Small Joys
+            </h2>
+            <p className="text-sm text-slate-400 mt-1">Experiences within reach.</p>
+          </div>
+          <button 
+            onClick={handleAddSmallJoy}
+            className="p-2 bg-amber-500 text-white rounded-xl shadow-lg hover:bg-amber-600 transition-colors"
+            title="Add Small Joy"
+          >
+              <Plus size={20}/>
+          </button>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 auto-rows-min">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 auto-rows-min pb-10">
           {items.filter(i => i.type === 'small_joy').map(item => (
             <SmallJoy 
                 key={item.id} 
@@ -238,7 +255,7 @@ const Wishlist: React.FC = () => {
             onClick={handleAddSmallJoy}
             className="p-4 rounded-2xl border-2 border-dashed border-slate-300 text-slate-400 flex flex-col items-center justify-center gap-2 hover:border-amber-300 hover:text-amber-500 hover:bg-amber-50/30 transition-all min-h-[140px]"
           >
-            <PlusIcon />
+            <Plus size={24} />
             <span className="text-sm font-medium">Add Experience</span>
           </button>
         </div>
@@ -246,7 +263,7 @@ const Wishlist: React.FC = () => {
 
       {/* Right: Long Term Goals */}
       <div className="lg:col-span-7 flex flex-col gap-4">
-        <div className="glass-panel p-6 rounded-3xl sticky top-0 z-10 flex justify-between items-center">
+        <div className="glass-panel p-6 rounded-3xl sticky top-0 z-10 flex justify-between items-center bg-white/80 backdrop-blur-md">
           <div>
             <h2 className="text-2xl font-light text-slate-700 flex items-center gap-2">
                 <span className="bg-purple-100 p-2 rounded-lg text-purple-600"><Star size={20}/></span>
@@ -277,14 +294,16 @@ const Wishlist: React.FC = () => {
                 onToggle={toggleComplete}
             />
           ))}
+          {items.filter(i => i.type === 'long_term').length === 0 && (
+            <div className="p-12 border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 text-center">
+              <Star size={48} className="mb-4 opacity-20" />
+              <p className="max-w-xs">Your long-term visions define your future trajectory. Add your first one above.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
-
-const PlusIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-)
 
 export default Wishlist;

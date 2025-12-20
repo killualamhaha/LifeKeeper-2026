@@ -23,30 +23,30 @@ interface ResearchItem {
 const Finance: React.FC = () => {
   // -- STATE WITH PERSISTENCE --
   const [stocks, setStocks] = useState<StockItem[]>(() => {
-    const saved = localStorage.getItem('finance_stocks');
+    const saved = localStorage.getItem('finance_stocks_v3');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [research, setResearch] = useState<ResearchItem[]>(() => {
-    const saved = localStorage.getItem('finance_research');
+    const saved = localStorage.getItem('finance_research_v3');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Persistence Effects
+  // Persistence Effects - Auto-saves on state change
   useEffect(() => {
-    localStorage.setItem('finance_stocks', JSON.stringify(stocks));
+    localStorage.setItem('finance_stocks_v3', JSON.stringify(stocks));
   }, [stocks]);
 
   useEffect(() => {
-    localStorage.setItem('finance_research', JSON.stringify(research));
+    localStorage.setItem('finance_research_v3', JSON.stringify(research));
   }, [research]);
 
 
-  // Add/Edit Stock State
+  // Add/Edit Stock State - Using string for numerical fields for deletability
   const [isAddingStock, setIsAddingStock] = useState(false);
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
-  const [newStock, setNewStock] = useState<Partial<StockItem>>({
-    symbol: '', name: '', price: 0, change: 0, shares: 0, remarks: ''
+  const [newStock, setNewStock] = useState<any>({
+    symbol: '', name: '', price: '', change: '', shares: '', remarks: ''
   });
 
   // Add/Edit Research State
@@ -58,36 +58,35 @@ const Finance: React.FC = () => {
 
   // Stock Handlers
   const handleSaveStock = () => {
-    if (newStock.symbol && newStock.price !== undefined) {
-      if (editingStockId) {
-        setStocks(prev => prev.map(s => s.id === editingStockId ? {
-          ...s,
-          symbol: newStock.symbol!.toUpperCase(),
+    if (newStock.symbol) {
+      const payload: StockItem = {
+          id: editingStockId || Date.now().toString(),
+          symbol: newStock.symbol.toUpperCase(),
           name: newStock.name || '',
-          price: Number(newStock.price),
-          change: Number(newStock.change) || 0,
-          shares: Number(newStock.shares) || 0,
+          price: parseFloat(newStock.price) || 0,
+          change: parseFloat(newStock.change) || 0,
+          shares: parseFloat(newStock.shares) || 0,
           remarks: newStock.remarks || ''
-        } : s));
+      };
+
+      if (editingStockId) {
+        setStocks(prev => prev.map(s => s.id === editingStockId ? payload : s));
         setEditingStockId(null);
       } else {
-        setStocks([...stocks, {
-          id: Date.now().toString(),
-          symbol: newStock.symbol!.toUpperCase(),
-          name: newStock.name || '',
-          price: Number(newStock.price),
-          change: Number(newStock.change) || 0,
-          shares: Number(newStock.shares) || 0,
-          remarks: newStock.remarks || ''
-        }]);
+        setStocks(prev => [...prev, payload]);
       }
       setIsAddingStock(false);
-      setNewStock({ symbol: '', name: '', price: 0, change: 0, shares: 0, remarks: '' });
+      setNewStock({ symbol: '', name: '', price: '', change: '', shares: '', remarks: '' });
     }
   };
 
   const handleEditStock = (stock: StockItem) => {
-    setNewStock({ ...stock });
+    setNewStock({ 
+        ...stock, 
+        price: stock.price.toString(), 
+        change: stock.change.toString(), 
+        shares: stock.shares.toString() 
+    });
     setEditingStockId(stock.id);
     setIsAddingStock(true);
   };
@@ -95,14 +94,12 @@ const Finance: React.FC = () => {
   const handleCancelStock = () => {
     setIsAddingStock(false);
     setEditingStockId(null);
-    setNewStock({ symbol: '', name: '', price: 0, change: 0, shares: 0, remarks: '' });
+    setNewStock({ symbol: '', name: '', price: '', change: '', shares: '', remarks: '' });
   };
 
   const handleDeleteStock = (id: string) => {
-    setStocks(stocks.filter(s => s.id !== id));
-    if (editingStockId === id) {
-      handleCancelStock();
-    }
+    setStocks(prev => prev.filter(s => s.id !== id));
+    if (editingStockId === id) handleCancelStock();
   };
 
   // Research Handlers
@@ -114,12 +111,11 @@ const Finance: React.FC = () => {
           title: newResearch.title,
           preview: newResearch.note,
           tags: newResearch.tags.split(',').map(t => t.trim()).filter(Boolean),
-          // Keep original date if editing, or update it? Let's keep original date for now.
           date: r.date 
         } : r));
         setEditingResearchId(null);
       } else {
-        setResearch([...research, {
+        setResearch(prev => [...prev, {
           id: Date.now().toString(),
           title: newResearch.title,
           preview: newResearch.note,
@@ -149,10 +145,8 @@ const Finance: React.FC = () => {
   };
 
   const handleDeleteResearch = (id: string) => {
-    setResearch(research.filter(r => r.id !== id));
-    if (editingResearchId === id) {
-      handleCancelResearch();
-    }
+    setResearch(prev => prev.filter(r => r.id !== id));
+    if (editingResearchId === id) handleCancelResearch();
   };
 
   return (
@@ -178,19 +172,19 @@ const Finance: React.FC = () => {
           )}
 
           {stocks.map((stock) => (
-             <div key={stock.id} className="bg-white/50 p-4 rounded-2xl border border-transparent hover:border-purple-100 group relative">
+             <div key={stock.id} className="bg-white/50 p-4 rounded-2xl border border-transparent hover:border-purple-100 group relative transition-all">
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={() => handleEditStock(stock)}
-                    className="p-1 text-slate-300 hover:text-purple-400 transition-colors"
+                    className="p-1.5 text-slate-300 hover:text-purple-400 bg-white/80 rounded-full shadow-sm transition-colors"
                   >
-                    <Pencil size={16} />
+                    <Pencil size={14} />
                   </button>
                   <button 
                     onClick={() => handleDeleteStock(stock.id)}
-                    className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                    className="p-1.5 text-slate-300 hover:text-red-400 bg-white/80 rounded-full shadow-sm transition-colors"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
 
@@ -228,36 +222,49 @@ const Finance: React.FC = () => {
           ))}
 
           {isAddingStock ? (
-             <div className="bg-white p-4 rounded-2xl border border-purple-200 shadow-sm space-y-3 animate-in slide-in-from-bottom-2 fade-in duration-300">
+             <div className="bg-white p-6 rounded-2xl border border-purple-200 shadow-xl space-y-4 animate-in slide-in-from-bottom-2 fade-in duration-300">
                 <div className="flex justify-between items-center mb-1">
-                  <h4 className="text-sm font-medium text-purple-700">{editingStockId ? 'Edit Position' : 'Add New Position'}</h4>
-                  <button onClick={handleCancelStock} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
+                  <h4 className="text-sm font-bold text-purple-700 uppercase tracking-widest">{editingStockId ? 'Update Position' : 'New Position'}</h4>
+                  <button onClick={handleCancelStock} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                   <input className="p-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-300" placeholder="Symbol (e.g. NVDA)" value={newStock.symbol} onChange={e => setNewStock({...newStock, symbol: e.target.value})} />
-                   <input className="p-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-300" placeholder="Name (Optional)" value={newStock.name} onChange={e => setNewStock({...newStock, name: e.target.value})} />
+                <div className="grid grid-cols-2 gap-3">
+                   <div>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Symbol</label>
+                       <input className="w-full p-2.5 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100" placeholder="NVDA" value={newStock.symbol} onChange={e => setNewStock({...newStock, symbol: e.target.value})} />
+                   </div>
+                   <div>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Name</label>
+                       <input className="w-full p-2.5 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100" placeholder="NVIDIA Corp" value={newStock.name} onChange={e => setNewStock({...newStock, name: e.target.value})} />
+                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                   <input type="number" className="p-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-300" placeholder="Price" value={newStock.price || ''} onChange={e => setNewStock({...newStock, price: parseFloat(e.target.value)})} />
-                   <input type="number" className="p-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-300" placeholder="Shares" value={newStock.shares || ''} onChange={e => setNewStock({...newStock, shares: parseFloat(e.target.value)})} />
-                   <input type="number" className="p-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-300" placeholder="Change %" value={newStock.change || ''} onChange={e => setNewStock({...newStock, change: parseFloat(e.target.value)})} />
+                <div className="grid grid-cols-3 gap-3">
+                   <div>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Price</label>
+                       <input type="number" className="w-full p-2.5 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100" placeholder="0.00" value={newStock.price} onChange={e => setNewStock({...newStock, price: e.target.value})} />
+                   </div>
+                   <div>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Shares</label>
+                       <input type="number" className="w-full p-2.5 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100" placeholder="0" value={newStock.shares} onChange={e => setNewStock({...newStock, shares: e.target.value})} />
+                   </div>
+                   <div>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Change %</label>
+                       <input type="number" className="w-full p-2.5 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100" placeholder="0.0" value={newStock.change} onChange={e => setNewStock({...newStock, change: e.target.value})} />
+                   </div>
                 </div>
-                <input 
-                  className="w-full p-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-300" 
-                  placeholder="Remarks" 
-                  value={newStock.remarks || ''} 
-                  onChange={e => setNewStock({...newStock, remarks: e.target.value})} 
-                />
-                <button onClick={handleSaveStock} className="w-full py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm font-medium flex items-center justify-center gap-2">
-                  <Save size={14}/> {editingStockId ? 'Update Position' : 'Save Position'}
+                <div>
+                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Remarks</label>
+                   <input className="w-full p-2.5 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100" placeholder="Investment thesis..." value={newStock.remarks || ''} onChange={e => setNewStock({...newStock, remarks: e.target.value})} />
+                </div>
+                <button onClick={handleSaveStock} className="w-full py-3.5 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 shadow-lg shadow-purple-200 text-sm font-bold flex items-center justify-center gap-2 transition-all">
+                  <Save size={18}/> {editingStockId ? 'Commit Update' : 'Initialize Position'}
                 </button>
              </div>
           ) : (
             <button 
               onClick={() => setIsAddingStock(true)}
-              className="w-full py-3 rounded-xl border-2 border-dashed border-purple-200 text-purple-400 hover:bg-purple-50 transition-colors flex items-center justify-center gap-2 mt-4"
+              className="w-full py-4 rounded-2xl border-2 border-dashed border-purple-200 text-purple-400 hover:bg-purple-50/50 hover:border-purple-300 transition-all flex items-center justify-center gap-2 mt-4"
             >
-               <Plus size={18} /> Add Stock
+               <Plus size={20} /> New Portfolio Entry
             </button>
           )}
         </div>
@@ -271,7 +278,7 @@ const Finance: React.FC = () => {
           </div>
           <div>
              <h2 className="text-2xl font-light text-slate-700">Research Lab</h2>
-             <p className="text-xs text-slate-400">Deep dives & due diligence for stocks</p>
+             <p className="text-xs text-slate-400">Deep dives & due diligence</p>
           </div>
         </div>
 
@@ -293,15 +300,15 @@ const Finance: React.FC = () => {
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={() => handleEditResearch(item)}
-                    className="p-1 text-slate-300 hover:text-sky-500 transition-colors"
+                    className="p-1.5 text-slate-300 hover:text-sky-500 bg-white/80 rounded-full shadow-sm transition-colors"
                   >
-                    <Pencil size={16} />
+                    <Pencil size={14} />
                   </button>
                   <button 
                     onClick={() => handleDeleteResearch(item.id)}
-                    className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                    className="p-1.5 text-slate-300 hover:text-red-400 bg-white/80 rounded-full shadow-sm transition-colors"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
                 <div className="flex justify-between items-start mb-1 pr-14">
@@ -320,40 +327,40 @@ const Finance: React.FC = () => {
            ))}
            
            {isAddingResearch ? (
-             <div className="bg-white p-4 rounded-2xl border border-sky-200 shadow-sm space-y-3 animate-in slide-in-from-bottom-2 fade-in duration-300">
+             <div className="bg-white p-6 rounded-2xl border border-sky-200 shadow-xl space-y-4 animate-in slide-in-from-bottom-2 fade-in duration-300">
                 <div className="flex justify-between items-center mb-1">
-                  <h4 className="text-sm font-medium text-sky-700">{editingResearchId ? 'Edit Entry' : 'New Research Entry'}</h4>
-                  <button onClick={handleCancelResearch} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
+                  <h4 className="text-sm font-bold text-sky-700 uppercase tracking-widest">{editingResearchId ? 'Update Entry' : 'New Research Entry'}</h4>
+                  <button onClick={handleCancelResearch} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
                 </div>
                 <input 
-                  className="w-full p-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-1 focus:ring-sky-300" 
-                  placeholder="Title (e.g. TSLA Earnings Review)" 
+                  className="w-full p-3 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-100" 
+                  placeholder="Title (e.g. NVDA Earnings Review)" 
                   value={newResearch.title}
                   onChange={e => setNewResearch({...newResearch, title: e.target.value})}
                 />
                 <textarea 
-                  className="w-full p-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-1 focus:ring-sky-300 resize-none" 
+                  className="w-full p-3 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-100 resize-none" 
                   placeholder="Key takeaways, analysis, or thoughts..."
-                  rows={3}
+                  rows={4}
                   value={newResearch.note}
                   onChange={e => setNewResearch({...newResearch, note: e.target.value})}
                 />
                 <input 
-                  className="w-full p-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-1 focus:ring-sky-300" 
+                  className="w-full p-3 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-100" 
                   placeholder="Tags (comma separated)" 
                   value={newResearch.tags}
                   onChange={e => setNewResearch({...newResearch, tags: e.target.value})}
                 />
-                <button onClick={handleSaveResearch} className="w-full py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 text-sm font-medium flex items-center justify-center gap-2">
-                  <Save size={14}/> {editingResearchId ? 'Update Note' : 'Save Note'}
+                <button onClick={handleSaveResearch} className="w-full py-3.5 bg-sky-500 text-white rounded-2xl hover:bg-sky-600 shadow-lg shadow-sky-100 text-sm font-bold flex items-center justify-center gap-2 transition-all">
+                  <Save size={18}/> Commit to Lab
                 </button>
              </div>
            ) : (
              <button 
               onClick={() => setIsAddingResearch(true)}
-              className="w-full py-3 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-sky-300 hover:text-sky-500 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-4 rounded-2xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-sky-300 hover:text-sky-500 transition-all flex items-center justify-center gap-2"
              >
-               <AlertCircle size={16} /> New Research Entry
+               <AlertCircle size={20} /> Log Research Entry
              </button>
            )}
         </div>
